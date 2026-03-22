@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,23 +15,27 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Plus, Users, Calendar, User, CalendarCheck } from "lucide-react";
+import {
+  Plus,
+  Users,
+  Calendar,
+  User,
+  CalendarCheck,
+  Mail,
+  CalendarClock,
+} from "lucide-react";
+import {
+  type TimeSlot,
+  type Member,
+  DAYS,
+  HOURS,
+  slot,
+  commonSlotsForMembers,
+  formatSlotLabel,
+} from "@/lib/scheduling";
+import { INITIAL_MEMBERS, DEMO_MEETING_TITLE } from "@/lib/demo-data";
+import { useEventSlotFromStorage } from "@/lib/use-event-slot";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type TimeSlot = string; // "day-hour", e.g. "0-9" = Monday 9am
-
-type Member = {
-  id: string;
-  name: string;
-  color: string;
-  availability: TimeSlot[];
-};
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const DAYS = ["週一", "週二", "週三", "週四", "週五"];
-const HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17];
 const COLORS = [
   "bg-orange-500",
   "bg-pink-500",
@@ -39,47 +44,6 @@ const COLORS = [
   "bg-red-500",
   "bg-yellow-500",
   "bg-cyan-500",
-];
-
-const slot = (day: number, hour: number): TimeSlot => `${day}-${hour}`;
-
-// ─── Fake initial data ────────────────────────────────────────────────────────
-
-// 假資料：三人皆有「週三 9–11」共同空閒，方便展示
-const INITIAL_MEMBERS: Member[] = [
-  {
-    id: "me",
-    name: "我",
-    color: "bg-blue-500",
-    availability: [
-      slot(0, 9), slot(0, 10), slot(0, 11),          // Mon 9–12
-      slot(0, 14), slot(0, 15), slot(0, 16),         // Mon 14–17
-      slot(2, 9),  slot(2, 10), slot(2, 11),         // Wed 9–12（共同）
-      slot(3, 14), slot(3, 15), slot(3, 16),         // Thu 14–17
-      slot(4, 9),  slot(4, 10),                      // Fri 9–11
-    ],
-  },
-  {
-    id: "xiao-liang",
-    name: "小梁",
-    color: "bg-green-500",
-    availability: [
-      slot(0, 9),  slot(0, 10), slot(0, 11),         // Mon 9–12
-      slot(2, 9),  slot(2, 10), slot(2, 11),         // Wed 9–12（共同）
-      slot(2, 14), slot(2, 15), slot(2, 16),         // Wed 14–17
-      slot(4, 9),  slot(4, 10),                      // Fri 9–11
-    ],
-  },
-  {
-    id: "lu-lu",
-    name: "盧盧",
-    color: "bg-purple-500",
-    availability: [
-      slot(1, 10), slot(1, 11), slot(1, 12),         // Tue 10–13
-      slot(2, 9),  slot(2, 10), slot(2, 11),         // Wed 9–12（共同）
-      slot(3, 14), slot(3, 15),                      // Thu 14–16
-    ],
-  },
 ];
 
 // ─── Schedule Grid Component ──────────────────────────────────────────────────
@@ -227,16 +191,13 @@ export default function MeetFlow() {
   const [newName, setNewName] = useState("");
   const [open, setOpen] = useState(false);
   const [viewId, setViewId] = useState("xiao-liang");
+  const eventSlot = useEventSlotFromStorage();
 
   const me = members.find((m) => m.id === "me")!;
   const others = members.filter((m) => m.id !== "me");
   const viewing = members.find((m) => m.id === viewId) ?? others[0];
 
-  const commonSlots = DAYS.flatMap((_, d) =>
-    HOURS.filter((h) =>
-      members.every((m) => m.availability.includes(slot(d, h)))
-    ).map((h) => slot(d, h))
-  );
+  const commonSlots = commonSlotsForMembers(members);
 
   function batchToggleMySlots(slots: TimeSlot[], fill: boolean) {
     setMembers((prev) =>
@@ -283,6 +244,35 @@ export default function MeetFlow() {
 
       {/* ── Main ── */}
       <main className="max-w-4xl mx-auto px-6 py-8">
+        <Card className="mb-8 border-primary/25 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              行事曆邀請
+            </CardTitle>
+            <p className="text-sm text-muted-foreground font-normal">
+              你收到一則會議邀請，可隨時改期並通知所有參與者。
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div>
+                <p className="font-medium">{DEMO_MEETING_TITLE}</p>
+                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+                  <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                  {formatSlotLabel(eventSlot)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  參與者：{members.map((m) => m.name).join("、")}
+                </p>
+              </div>
+              <Button asChild className="shrink-0 gap-1.5">
+                <Link href="/reschedule">重新排程</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs defaultValue="members">
           <TabsList className="mb-8 h-10">
             <TabsTrigger value="members" className="gap-1.5 text-sm">
